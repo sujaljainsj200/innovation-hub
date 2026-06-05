@@ -1,0 +1,12 @@
+{
+  "name": "innovation-hub",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Innovation Hub — NPD project management portal (Vercel + Google Sheets + Google Drive)",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "dependencies": {
+    "googleapis": "^131.0.0"
+  }
+}

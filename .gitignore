@@ -1,0 +1,7 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.api-secret-backup.txt
+*.log
+.vercel/
