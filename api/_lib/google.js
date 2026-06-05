@@ -29,13 +29,17 @@ function parseServiceAccountKey() {
 
 function getAuth() {
   const creds = parseServiceAccountKey();
-  return new google.auth.GoogleAuth({
+  const opts = {
     credentials: creds,
     scopes: [
       'https://www.googleapis.com/auth/spreadsheets',
       'https://www.googleapis.com/auth/drive.file',
     ],
-  });
+  };
+  if (process.env.GOOGLE_IMPERSONATE_EMAIL) {
+    opts.clientOptions = { subject: process.env.GOOGLE_IMPERSONATE_EMAIL };
+  }
+  return new google.auth.GoogleAuth(opts);
 }
 
 async function readSheet() {
