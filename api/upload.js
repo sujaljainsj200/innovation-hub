@@ -1,18 +1,16 @@
 /**
  * /api/upload
  *
- * POST -> uploads a file to Google Drive.
+ * POST -> uploads a file to Google Drive via Apps Script web app.
  *         Returns a public URL that gets saved on the document record
  *         in the Google Sheet.
  *
  * Body:     { fileData: "data:...;base64,...", fileName: "report.pdf", fileType: "application/pdf" }
- * Returns:  { url, fileName, fileSize, fileType, driveFileId }
+ * Returns:  { url, fileName, fileSize, fileType }
  *
  * Auth: requires header
  *   X-API-Secret: <value of API_SECRET env var>
  */
-
-const { uploadToDrive } = require('./_lib/google');
 
 function checkAuth(req) {
   const expected = process.env.API_SECRET;
@@ -43,6 +41,11 @@ async function handler(req, res) {
   }
 
   try {
+    const driveUrl = process.env.DRIVE_UPLOAD_URL;
+    if (!driveUrl) {
+      return res.status(500).json({ error: 'DRIVE_UPLOAD_URL env var is not configured' });
+    }
+
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     const { fileData, fileName, fileType } = body || {};
     if (!fileData || !fileName) {
@@ -55,16 +58,34 @@ async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid file data — expected base64 data URL' });
     }
     const mimeType = matches[1] || fileType || 'application/octet-stream';
-    const buffer = Buffer.from(matches[2], 'base64');
+    const base64Data = matches[2];
+    const fileSize = Buffer.from(base64Data, 'base64').length;
 
-    const result = await uploadToDrive(fileName, buffer, mimeType);
+    // Send to Google Apps Script web app
+    const resp = await fetch(driveUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileBase64: base64Data,
+        fileName: fileName,
+        mimeType: mimeType,
+      }),
+      redirect: 'follow',
+    });
+
+    const text = await resp.text();
+    let driveResult;
+    try { driveResult = JSON.parse(text); } catch { driveResult = { url: text }; }
+
+    if (driveResult.error) {
+      throw new Error(driveResult.error);
+    }
 
     return res.status(200).json({
-      url: result.url,
-      fileName: result.fileName,
-      fileSize: result.fileSize || buffer.length,
+      url: driveResult.url || driveResult.fileUrl || '',
+      fileName: fileName,
+      fileSize: fileSize,
       fileType: mimeType,
-      driveFileId: result.fileId,
     });
   } catch (err) {
     console.error('[/api/upload]', err);
